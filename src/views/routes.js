@@ -10,6 +10,7 @@ import UserSnap from './analysisuser/user.snap';
 import AnalysisSearch from './analysisaction/search.analysis';
 import Bill from './bill/index';
 import Trans from './bill/trans';
+import Indexer from './appmgmt/indexer';
 
 const ROUTES = {
     DASHBOARD: {
@@ -34,6 +35,14 @@ const ROUTES = {
         component: DataManagement,
         public: false,
         breadcrumb: 'DataManagement',
+        level: 1
+    },
+    INDEX_MANAGEMENT: {
+        path: "/indexer",
+        name: "indexer",
+        component: Indexer,
+        public: false,
+        breadcrumb: 'Indexer',
         level: 1
     },
     DATA_IMPORT: {

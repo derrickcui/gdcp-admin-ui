@@ -61,6 +61,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import Bill from "./bill";
 import Trans from "./bill/trans";
+import Indexer from "./appmgmt/indexer";
 
 const drawerWidth = 220;
 
@@ -578,6 +579,33 @@ export default function Main() {
                                     </ListItemIcon>
 
                                     <MenuItem
+                                        button="true" onClick={() => updateSelected(10)}
+                                        selected={selected === 10}
+                                        component={Link}
+                                        to={ROUTES.INDEX_MANAGEMENT.path}>
+                                        <ListItemText primary={'字段管理'} sx={{ opacity: open ? 1 : 0 }} />
+                                    </MenuItem>
+                                </ListItemButton>
+                            </ListItem>
+                            <ListItem key={'dataImport'} disablePadding sx={{ display: 'block' }}>
+                                <ListItemButton
+                                    sx={{
+                                        minHeight: 48,
+                                        justifyContent: open ? 'initial' : 'center',
+                                        px: 1.5,
+                                    }}
+                                >
+                                    <ListItemIcon
+                                        sx={{
+                                            minWidth: 0,
+                                            mr: open ? 1 : 'auto',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <PostAddIcon/>
+                                    </ListItemIcon>
+
+                                    <MenuItem
                                         button="true" onClick={() => updateSelected(11)}
                                         selected={selected === 11}
                                         component={Link}
@@ -855,6 +883,7 @@ export default function Main() {
                         <Route path="dashboard" element={<Dashboard />} />
                         <Route path='data' element={<DataManagement/>}/>
                         <Route path='dataImport' element={<DataImport/>}/>
+                        <Route path='indexer' element={<Indexer/>}/>
                         <Route path='analysisUser' element={<AnalysisUser/>}/>
                         <Route path='analysisData' element={<AnalysisData/>}/>
                         <Route path='analysisAction' element={<AnalysisAction/>}/>
