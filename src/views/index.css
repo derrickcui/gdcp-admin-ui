@@ -1,0 +1,11 @@
+.card-5 {
+    background: #fff;
+    border-radius: 2px;
+    display: inline-block;
+    max-height: 500px;
+    min-height: 300px;
+    margin: 0rem;
+    position: relative;
+    width: 250px;
+    box-shadow: 0 19px 38px rgba(0,0,0,0.20), 0 15px 12px rgba(0,0,0,0.22);
+}
