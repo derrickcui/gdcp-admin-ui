@@ -5,7 +5,7 @@ import { blue } from '@mui/material/colors';
 import Button from '@mui/material/Button';
 
 export default function SubmitButton(props) {
-    const {loading, handleButtonClick} = props;
+    const {loading, disabled, handleButtonClick} = props;
 
     const buttonSx = {
         ...(!loading && {
@@ -22,7 +22,7 @@ export default function SubmitButton(props) {
                 <Button
                     variant="contained"
                     sx={buttonSx}
-                    disabled={loading}
+                    disabled={loading || disabled}
                     onClick={handleButtonClick}
                     {...props}
                 >

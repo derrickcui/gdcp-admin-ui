@@ -11,6 +11,7 @@ import AnalysisSearch from './analysisaction/search.analysis';
 import Bill from './bill/index';
 import Trans from './bill/trans';
 import Indexer from './appmgmt/indexer';
+import AppManagement from './appmgmt/index';
 
 const ROUTES = {
     DASHBOARD: {
@@ -43,6 +44,14 @@ const ROUTES = {
         component: Indexer,
         public: false,
         breadcrumb: 'Indexer',
+        level: 1
+    },
+    APP_MANAGEMENT: {
+        path: "/appManage",
+        name: "appManage",
+        component: AppManagement,
+        public: false,
+        breadcrumb: 'appManage',
         level: 1
     },
     DATA_IMPORT: {

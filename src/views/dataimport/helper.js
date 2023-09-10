@@ -87,6 +87,14 @@ export default function Helper(props) {
                     <Spreadsheet data={data} />
                 </Typography>
                 }
+                {props.indexType === 'remoteFile' &&
+                <Typography style={{fontSize: 14}}>
+                    <Typography style={{fontSize: 14}}>
+                        <p>对于大文件数据，应预先上传到Geelink服务器</p>
+                        <p>利用Geelink数据处理系统的能力解析文件内容，保存到智能感知系统中，文件格式支持<Text data='WORD'/>，<Text data='PDF'/>，<Text data='EXCEL'/>，<Text data='JSON'/>，<Text data='csv'/>等常见文件类型。</p>
+                    </Typography>
+                </Typography>
+                }
             </div>
     );
 }

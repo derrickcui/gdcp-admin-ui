@@ -20,7 +20,8 @@ export default function Summary() {
     const [ location, setLocation ] = useState();
     const [ latestDateTime, setLatestDateTime ] = useState();
     const [ latestUserIP, setLatestUserIP ] = useState();
-    const [ clickcount, setClickCount ] = useState();
+    const [ clickcount, setClickCount ] = useState()
+    const user = auth && auth.token && jwt_decode(auth.token);;
 
     const [{data: getUserDetail, loading: getUserDetailLoading, error: getUserDetailError}, getUserDetailApi] = useQueryDistribute(
         {}, {manual: true});
@@ -29,7 +30,6 @@ export default function Summary() {
         {}, {manual: true});
 
     useEffect(() => {
-        const user = auth && auth.token && jwt_decode(auth.token);
         if (user === 'undefined' || user === null) return;
         if (!application || application === 'undefined' || application === null) return;
 

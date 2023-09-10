@@ -5,13 +5,14 @@ import {
     Divider,
     InputLabel,
     MenuItem,
-    Select,
+    Select, ListItem, List,
     FormControlLabel,
     RadioGroup,
-    Radio,
+    ListItemText,
+    Radio, Checkbox,
     FormControl, Paper, TextField
 } from '@mui/material';
-import { useDataServicePostAxios } from "../../service/api.service";
+import {useDataServiceGetAxios, useDataServicePostAxios} from "../../service/api.service";
 import {WorkspaceContext} from "../../privacy/WorkspaceContext";
 import isURI from "@stdlib/assert-is-uri";
 import {MESSAGE_ERROR, MESSAGE_SUCCESS} from "../../constant";
@@ -23,6 +24,17 @@ import Document from './document';
 import Helper from "./helper";
 import './styles.css';
 import 'font-awesome/css/font-awesome.min.css';
+
+const ITEM_HEIGHT = 48;
+const ITEM_PADDING_TOP = 8;
+const MenuProps = {
+    PaperProps: {
+        style: {
+            maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
+            width: 250,
+        },
+    },
+};
 
 export default function ImportFile() {
     const {message, setMessage} = useContext(AppContext);
@@ -39,15 +51,23 @@ export default function ImportFile() {
     const [{data: previewUriData, loading: previewUriLoading, error: previewUriError}, previewUriApi] = useDataServicePostAxios(
         {}, {manual: true});
 
-    const [ selectedPipeline, setSelectedPipeline ] = useState("none");
+    const [{data: listFileData, loading: listFileLoading, error: listFileError}, listFileApi] = useDataServiceGetAxios(
+        {}, {manual: true});
+    const [{data: listFolderData, loading: listFolderLoading, error: listFolderError}, listFolderApi] = useDataServiceGetAxios(
+        {}, {manual: true});
+
+    const [selectedPipeline, setSelectedPipeline] = useState("none");
     const [selectedDate, handleDateChange] = useState(new Date());
-    const [ selectedFile, setSelectedFile ] = useState();
-    const [ indexType, setIndexType ] = useState("local");
-    const [ execType, setExecType ] = useState("sync");
-    const [ uri, setUri ] = useState('');
-    const [ error, setError ] = useState();
-    const [ collection, setCollection ] = useState('');
-    const [ previewDocs, setPreviewDocs ] = useState([]);
+    const [selectedFile, setSelectedFile] = useState();
+    const [indexType, setIndexType] = useState("local");
+    const [execType, setExecType] = useState("sync");
+    const [uri, setUri] = useState('');
+    const [error, setError] = useState();
+    const [collection, setCollection] = useState('');
+    const [previewDocs, setPreviewDocs] = useState([]);
+    const [remoteFileList, setRemoteFileList] = useState([]);
+
+    const [indexFileList, setIndexFileList] = React.useState([]);
 
     const handleUriChange = (e) => {
         let fileUri = e.target.value;
@@ -55,7 +75,7 @@ export default function ImportFile() {
             setUri(fileUri);
             setError("");
         } else {
-            setError("URI地址错误")
+            setError("URI地址错误");
         }
     }
 
@@ -68,17 +88,42 @@ export default function ImportFile() {
     }, [ collectionList ]);
 
     const handleIndexTypeChange = (e) => {
+        setMessage({
+            type: 'init',
+            text: ""
+        });
+        setError('');
+        setIndexFileList([]);
+        setUri('');
         setIndexType(e.target.value);
         if ( e.target.value === 'uri' ) {
             setSelectedFile(null);
         } else if ( e.target.value === 'local' ) {
             setExecType("sync");
             setUri('');
-        } else {
-
+        } else if (e.target.value === 'remoteFile') {
+            listFileApi({
+                url: '/apps/file'
+            });
+            setRemoteFileList([]);
+        } else if (e.target.value === 'remoteFolder') {
+            listFolderApi({
+                url: '/apps/folder'
+            });
         }
         setSelectedFile(null);
     }
+
+
+    const handleRemoteChange = (event) => {
+        const {
+            target: { value },
+        } = event;
+        setIndexFileList(
+            // On autofill we get a string field value.
+            typeof value === 'string' ? value.split(',') : value,
+        );
+    };
 
     const handleSubmit = () => {
         if ( indexType === "local" || indexType === "database") {
@@ -116,11 +161,26 @@ export default function ImportFile() {
             return;
         }
 
-        if ( indexType === 'uri' ) {
+        let iType = '';
+        if (indexType === 'remoteFile') {
+            if (indexFileList.length === 0) {
+                setError("请选择索引文件");
+                return;
+            }
+            payload = indexFileList.map((item) => {return {id: "", file: item}});
+            iType = 'file';
+        } else if ( indexType === 'uri' ) {
+            if (!uri || uri.length === 0 || uri === '') {
+                setError("请填写URI");
+                return;
+            }
+
             payload = [{
                 id: "",
                 uri: uri
             }];
+
+            iType = 'uri';
         }
 
         let isAsync = (execType === "async");
@@ -145,7 +205,7 @@ export default function ImportFile() {
                 thread: 1
             },
             payload: payload,
-            type: 'uri'
+            type: iType
         }
 
         indexByConnector({
@@ -351,6 +411,43 @@ export default function ImportFile() {
         // eslint-disable-next-line
     }, [indexByConnectorLoading, indexByConnectorData, indexByConnectorError]);
 
+
+    useEffect(() => {
+        if (!listFileLoading) {
+            if (listFileError) {
+                if (listFileError.response && listFileError.response.data) {
+                    setMessage({
+                        type: MESSAGE_ERROR,
+                        text: listFileError.response.data.message
+                    });
+                } else {
+                    setMessage({
+                        type: MESSAGE_ERROR,
+                        text: "请检查网络正常或者联系技术支持"
+                    });
+                }
+            } else if (listFileData) {
+                if (listFileData.status === 0){
+                    setRemoteFileList(listFileData.result);
+                } else {
+                    if (listFileData.code || listFileData.message) {
+                        setMessage({
+                            type: MESSAGE_ERROR,
+                            text: "错误代码:" + listFileData.code + ", 错误信息：" + listFileData.message
+                        });
+                    } else {
+                        setMessage({
+                            type: MESSAGE_ERROR,
+                            text: "系統错误，请联系Geelink技术支持"
+                        });
+                    }
+                }
+            }
+        }
+        // eslint-disable-next-line
+    }, [listFileLoading, listFileData, listFileError]);
+
+
     const handlePiplineChange = (e) => {
         setSelectedPipeline(e.target.value);
     }
@@ -413,6 +510,18 @@ export default function ImportFile() {
                                     label={<Typography style={{fontSize: 14, color: 'black'}}>表格文件(excel,csv)</Typography>}
                                     labelPlacement="end"
                                 />
+                                <FormControlLabel
+                                    value="remoteFile"
+                                    control={<Radio color="primary" size="small"/>}
+                                    label={<Typography style={{fontSize: 14, color: 'black'}}>远程文件</Typography>}
+                                    labelPlacement="end"
+                                />
+                               {/* <FormControlLabel
+                                    value="remoteFolder"
+                                    control={<Radio color="primary" size="small"/>}
+                                    label={<Typography style={{fontSize: 14, color: 'black'}}>远程目录</Typography>}
+                                    labelPlacement="end"
+                                />*/}
                             </RadioGroup>
                         </Grid>
                         <Grid item xs={12}>
@@ -447,12 +556,62 @@ export default function ImportFile() {
                                     onChange={handleUriChange}
                                 />
                             }
+                            {
+                                indexType === 'remoteFile' && <div><div style={{display:'flex', flexDirection: 'row', alignItems:'center'}}>
+                                    <FormControl sx={{ m: 1, width: 300 }} size="small">
+                                        <Select
+                                            disabled={listFileLoading}
+                                            multiple
+                                            value={indexFileList}
+                                            onChange={handleRemoteChange}
+                                            renderValue={(selected) => '导入文件: ' + selected.length}
+                                            MenuProps={MenuProps}
+                                        >
+                                            {remoteFileList.map((name) => (
+                                                <MenuItem key={name} value={name}>
+                                                    <Checkbox checked={indexFileList.indexOf(name) > -1} size='small'/>
+                                                    <ListItemText primary={name}/>
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                    {listFileLoading && <span style={{color:'red', fontSize: 14}}>正在从服务器读取文件列表，请稍等...</span>}
+                                </div>
+
+                                    {
+                                        indexFileList && indexFileList.length > 0 &&  <List
+                                        sx={{
+                                            border: '1px solid #EDEDED',
+                                            width: '100%',
+                                            minHeight: 100,
+                                            maxWidth: 360,
+                                            bgcolor: 'background.paper',
+                                            position: 'relative',
+                                            overflow: 'auto',
+                                            maxHeight: 200,
+                                            '& ul': { padding: 0 },
+                                        }}
+                                        subheader={<li />}
+                                    > <li>
+                                                <ul>
+                                                    {indexFileList.map((item, index) => (
+                                                        <ListItem key={index} disablePadding={true}>
+                                                            <ListItemText primary={item}/>
+                                                        </ListItem>
+                                                    ))}
+                                                </ul>
+                                            </li>
+                                    </List>
+                                    }
+                                </div>
+
+                            }
                         </Grid>
                     </Grid>
                     <Grid item xs={12}>
                         <Item elevation={0} style={{display: 'flex', flexDirection: 'rows', columnGap: 10, justifyContent: 'center'}}>
                             <SubmitButton loading={previewFileLoading} handleButtonClick={handlePreview} size="small" sx={{width: 100}}
-                                          className={classes.submit} disabled={indexType === 'bdf'}>预览数据</SubmitButton>
+                                          className={classes.submit} disabled={indexType === 'bdf' || indexType === 'remoteFile' || indexType === "database"}>预览数据</SubmitButton>
                             <SubmitButton loading={indexFileLoading || indexByConnectorLoading} handleButtonClick={handleSubmit} size="small" sx={{width: 100}}
                                           className={classes.submit}>导入文件</SubmitButton>
                         </Item>

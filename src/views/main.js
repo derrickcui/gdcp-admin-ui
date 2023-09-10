@@ -35,6 +35,7 @@ import {useDataServiceGetAxios} from "../service/api.service";
 import {AppContext} from "../privacy/AppContext";
 import WarehouseIcon from '@mui/icons-material/Warehouse';
 import PostAddIcon from '@mui/icons-material/PostAdd';
+import LaptopIcon from '@mui/icons-material/Laptop';
 import TableViewIcon from '@mui/icons-material/TableView';
 import DataThresholdingIcon from '@mui/icons-material/DataThresholding';
 import SurfingIcon from '@mui/icons-material/Surfing';
@@ -62,6 +63,9 @@ import ReceiptIcon from '@mui/icons-material/Receipt';
 import Bill from "./bill";
 import Trans from "./bill/trans";
 import Indexer from "./appmgmt/indexer";
+import { pink } from '@mui/material/colors';
+import jwt_decode from "jwt-decode";
+import AppManagement from "./appmgmt";
 
 const drawerWidth = 220;
 
@@ -146,6 +150,7 @@ export default function Main() {
     const [collectionList, setCollectionList] = useState();
     const [pipelineList, setPipelineList] = useState();
     const [appStatus, setAppStatus] = useState(false);
+    const auth = JSON.parse(sessionStorage.getItem(LOCAL_STORAGE_AUTH));
 
     const handleApplicationClick = () => {
         setApplicationOpen(!applicationOpen);
@@ -169,8 +174,12 @@ export default function Main() {
 
     const updateSelected = (value) => {
         setSelected(value);
+        setMessage({
+           type: 'init',
+           message: ''
+        })
     }
-
+    const [clientUrl, setClientUrl] = useState("");
     const [open2, setOpen2] = React.useState(false);
     const [openSupport, setOpenSupport] = React.useState(false);
     const [billingOpen, setBillingOpen] = React.useState(false);
@@ -206,6 +215,10 @@ export default function Main() {
             getAppDetailApi({
                 url:'/apps/' + application + '/detail'
             });
+
+
+            const user = auth && auth.token && jwt_decode(auth.token);
+            setClientUrl(process.env.REACT_APP_CLIENT_URL + "/" + user.workspace + "/" + application)
         }
     }, [application]);
 
@@ -560,7 +573,7 @@ export default function Main() {
                     <Collapse in={applicationOpen} timeout="auto" unmountOnExit>
 
                         <List component="div" style={{marginLeft: "50px"}} dense={true}>
-                            <ListItem key={'dataImport'} disablePadding sx={{ display: 'block' }}>
+                            <ListItem key={'dataImport2'} disablePadding sx={{ display: 'block' }}>
                                 <ListItemButton
                                     sx={{
                                         minHeight: 48,
@@ -584,6 +597,33 @@ export default function Main() {
                                         component={Link}
                                         to={ROUTES.INDEX_MANAGEMENT.path}>
                                         <ListItemText primary={'字段管理'} sx={{ opacity: open ? 1 : 0 }} />
+                                    </MenuItem>
+                                </ListItemButton>
+                            </ListItem>
+                            <ListItem key={'appManage'} disablePadding sx={{ display: 'block' }}>
+                                <ListItemButton
+                                    sx={{
+                                        minHeight: 48,
+                                        justifyContent: open ? 'initial' : 'center',
+                                        px: 1.5,
+                                    }}
+                                >
+                                    <ListItemIcon
+                                        sx={{
+                                            minWidth: 0,
+                                            mr: open ? 1 : 'auto',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <PostAddIcon/>
+                                    </ListItemIcon>
+
+                                    <MenuItem
+                                        button="true" onClick={() => updateSelected(110)}
+                                        selected={selected === 110}
+                                        component={Link}
+                                        to={ROUTES.APP_MANAGEMENT.path}>
+                                        <ListItemText primary={'应用管理'} sx={{ opacity: open ? 1 : 0 }} />
                                     </MenuItem>
                                 </ListItemButton>
                             </ListItem>
@@ -873,6 +913,29 @@ export default function Main() {
                         </List>
                     </Collapse>
 
+                    <ListItem key={'client'} disablePadding sx={{ display: 'block'}}>
+                        <ListItemButton  component="a" href={clientUrl} target="_blank"
+                            sx={{
+                                height: 40,
+                                justifyContent: open ? 'initial' : 'center',
+                                px: 2.5,
+                            }}
+                        >
+                            <ListItemIcon
+                                            sx={{
+                                    minWidth: 0,
+                                    mr: open ? 1 : 'auto',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <LaptopIcon sx={{ color: pink[500] }} />
+                            </ListItemIcon>
+
+                            <ListItemText primary={'搜索客户端'} sx={{ opacity: open ? 1 : 0 }} />
+
+                        </ListItemButton>
+                    </ListItem>
+
                 </List>
             </Drawer>
             <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
@@ -884,6 +947,7 @@ export default function Main() {
                         <Route path='data' element={<DataManagement/>}/>
                         <Route path='dataImport' element={<DataImport/>}/>
                         <Route path='indexer' element={<Indexer/>}/>
+                        <Route path='appManage' element={<AppManagement/>}/>
                         <Route path='analysisUser' element={<AnalysisUser/>}/>
                         <Route path='analysisData' element={<AnalysisData/>}/>
                         <Route path='analysisAction' element={<AnalysisAction/>}/>
