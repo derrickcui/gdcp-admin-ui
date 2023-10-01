@@ -66,6 +66,10 @@ import Indexer from "./appmgmt/indexer";
 import { pink } from '@mui/material/colors';
 import jwt_decode from "jwt-decode";
 import AppManagement from "./appmgmt";
+import CircularProgress from "@mui/material/CircularProgress";
+import Backdrop from "@mui/material/Backdrop";
+import BusinessCenterIcon from '@mui/icons-material/BusinessCenter';
+import ListAltRoundedIcon from '@mui/icons-material/ListAltRounded';
 
 const drawerWidth = 220;
 
@@ -151,6 +155,7 @@ export default function Main() {
     const [pipelineList, setPipelineList] = useState();
     const [appStatus, setAppStatus] = useState(false);
     const auth = JSON.parse(sessionStorage.getItem(LOCAL_STORAGE_AUTH));
+    const [processing, setProcessing] = useState(false);
 
     const handleApplicationClick = () => {
         setApplicationOpen(!applicationOpen);
@@ -392,7 +397,8 @@ export default function Main() {
 
     let contextValues = {
         collectionList,
-        pipelineList
+        pipelineList,
+        setProcessing
     }
     return (
         <WorkspaceContext.Provider value={contextValues}>
@@ -588,7 +594,7 @@ export default function Main() {
                                             justifyContent: 'center',
                                         }}
                                     >
-                                        <PostAddIcon/>
+                                        <ListAltRoundedIcon/>
                                     </ListItemIcon>
 
                                     <MenuItem
@@ -615,7 +621,7 @@ export default function Main() {
                                             justifyContent: 'center',
                                         }}
                                     >
-                                        <PostAddIcon/>
+                                        <BusinessCenterIcon/>
                                     </ListItemIcon>
 
                                     <MenuItem
@@ -960,6 +966,12 @@ export default function Main() {
                     </Route>
                 </Routes>
             </Box>
+            <Backdrop
+                sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
+                open={processing}
+            >
+                <CircularProgress color="inherit" />
+            </Backdrop>
         </Box>
         </WorkspaceContext.Provider>
     );

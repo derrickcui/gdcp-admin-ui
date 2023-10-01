@@ -1,12 +1,11 @@
 import React, {useContext, useEffect, useState} from 'react';
 import {
-    Button, Divider, Grid, TextField, Typography, IconButton,
+    Button, Divider, Grid, TextField, Typography, IconButton,TablePagination,
     FormGroup, FormControlLabel, Checkbox, FormControl, Select, MenuItem, Paper
 } from "@mui/material";
 import {useDataServiceGetAxios, useDataServicePostAxios, useSearchEngineGetAxios} from "../../service/api.service";
 import {AppContext} from "../../privacy/AppContext";
 import {MESSAGE_ERROR} from "../../constant";
-import {getRowText} from "../../intl/provider";
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { makeStyles } from "@mui/styles";
@@ -14,21 +13,29 @@ import Drawer from '@mui/material/Drawer';
 import CloseIcon from '@mui/icons-material/Close';
 import SubmitButton from "../../component/submit.button";
 import {WorkspaceContext} from "../../privacy/WorkspaceContext";
-import tableIcons from "../../component/material.table.icon";
-import MaterialTable from "material-table";
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import KeyIcon from '@mui/icons-material/Key';
+import CheckIcon from '@mui/icons-material/Check';
+import Link from '@mui/material/Link';
 
 const useStyles = makeStyles({
     drawer: {
-        position: "relative",
+        position: "absolute",
         marginLeft: "auto",
         marginRight: 20,
+        marginTop: 120,
         width: 300,
         "& .MuiBackdrop-root": {
             display: "none",
         },
         "& .MuiDrawer-paper": {
             width: 300,
-            marginTop: -80,
+            height: 560,
             position: "relative",
             transition: "none !important"
         }
@@ -41,16 +48,32 @@ export default function Indexer() {
         {}, {manual: true});*/
     const [{data: getFieldData, loading: getFieldLoading, error: getFieldError}, getFieldApi] = useDataServiceGetAxios(
         {}, {manual: true});
-    const [fields, setFields] = useState([{name: 'id', type: 'string'}]);
+    const [{data: addFieldData, loading: addFieldLoading, error: addFieldError}, addFieldApi] = useDataServicePostAxios(
+        {}, {manual: true});
+
+    const [fields, setFields] = useState([{name: 'id', type: 'string', store: false, sort: false, suggest: false, search: false, recommend: false, facet: false}]);
     const {application, setMessage} = useContext(AppContext);
-    const { collectionList } = useContext(WorkspaceContext);
+    const { collectionList, setProcessing } = useContext(WorkspaceContext);
     const [add, setAdd] = useState(false);
+    const [page, setPage] = React.useState(0);
+    const [selected, setSelected] = useState([]);
+    const [action, setAction] = useState('add');
     const [field, setField] = useState({
         name: '',
         type: 'string',
-        props: []
+        store: false,
+        sort: false,
+        facet: false,
+        search: false,
+        recommend: false,
+        suggest: false
     });
     const classes = useStyles();
+
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
     const toggleDrawer = (event) => {
         if (event.type === 'keydown' && (event.key === 'Tab' || event.key === 'Shift')) {
             return;
@@ -60,47 +83,32 @@ export default function Indexer() {
     };
 
     const handleNameChange = (e) => {
-        field.name = e.target.value;
+        setField({
+            ...field,
+            [e.target.name]: e.target.type === 'checkbox'? e.target.checked: e.target.value
+        })
     }
-
-    const handleTypeChange = (e) => {
-        field.type = e.target.value;
-    }
-
-    const handlePropsChange = (e) => {
-        let selected = e.target.checked;
-        let value = e.target.value;
-
-        if (selected) {
-            if (field.props.includes(value)) {
-                console.warn("value is existing, ignore it");
-            } else {
-                field.props.push(value);
-            }
-
-            setField(Object.assign({}, field));
-
-            return;
-        }
-
-        if (!selected) {
-            if (field.props.includes(value)) {
-                field.props.splice(field.props.indexOf(value), 1)
-            } else {
-                console.warn("value doesn't exist, ignore it");
-            }
-
-
-            setField(Object.assign({}, field));
-        }
-    }
-
 
     const handleSubmit = () => {
-        let newFields = Object.assign({}, fields);
-        newFields.push(field);
-        setFields(Object.assign({}, newFields));
-        alert(JSON.stringify(fields));
+        let isMultipleValues = field.type.endsWith("s")
+        let data = {
+            name: field.name,
+            type: field.type,
+            required: false,
+            multiValue: isMultipleValues,
+            facet: field.facet,
+            sort: field.sort,
+            scoreSearch: field.scoreSearch,
+            search: field.search,
+            recommend: field.recommend,
+            suggest: field.suggest
+        };
+
+        addFieldApi({
+            url: '/schema/' + collectionList[0] + '/field',
+            data: data
+        });
+        setProcessing(true);
     }
 
     useEffect(() => {
@@ -111,25 +119,114 @@ export default function Indexer() {
                 getFieldApi({
                     url: '/schema/' + collectionList[0] + '/field'
                 });
+                setProcessing(true);
             }
         }
-    }, [application]);
+    }, [collectionList]);
+
+    useEffect(() => {
+        if (!getFieldLoading) {
+            setProcessing(false);
+            if (getFieldError) {
+                setMessage({
+                    type: MESSAGE_ERROR,
+                    text: "错误代码:" + getFieldError.code + ", 错误信息：" + getFieldError.message
+                });
+            } else if (getFieldData) {
+                if(getFieldData.status === 0 && getFieldData.result && getFieldData.result.length > 0) {
+                    setFields(getFieldData.result);
+                }
+            }
+        }
+    }, [getFieldLoading, getFieldData, getFieldError]);
+
+    useEffect(() => {
+        if (!addFieldLoading) {
+            setProcessing(false);
+            if (addFieldError) {
+                if (addFieldError.response && addFieldError.response.data) {
+                    setMessage({
+                        type: MESSAGE_ERROR,
+                        text: "错误代码:" + addFieldError.response.data.code + ", 错误信息：" + addFieldError.response.data.message
+                    });
+                } else {
+                    setMessage({
+                        type: MESSAGE_ERROR,
+                        text: "请检查网络正常或者联系技术支持"
+                    });
+                }
+            } else if (addFieldData) {
+                if(addFieldData.status === 0) {
+                    getFieldApi({
+                        url: '/schema/' + collectionList[0] + '/field'
+                    });
+                    setAdd(!add);
+                    setProcessing(true);
+                }
+            }
+        }
+    }, [addFieldLoading, addFieldData, addFieldError]);
 
     useEffect(() => {
         if (!getFieldLoading) {
             if (getFieldError) {
                 setMessage({
                     type: MESSAGE_ERROR,
-                    text: getRowText("getUserMonthCountError")
+                    text: "错误代码:" + getFieldError.code + ", 错误信息：" + getFieldError.message
                 });
             } else if (getFieldData) {
                 if(getFieldData.status === 0 && getFieldData.result && getFieldData.result.length > 0) {
-                    fields.push(getFieldData.result);
-                    setFields(Object.assign({}, fields));
+                    setFields(getFieldData.result);
                 }
             }
         }
     }, [getFieldLoading, getFieldData, getFieldError]);
+
+    const handleClick = (event, row) => {
+        setField(
+            {
+                name: row.name,
+                type: row.type,
+                store: row.store,
+                sort: row.sort,
+                facet: row.facet,
+                search: row.search,
+                recommend: row.recommend,
+                suggest: row.suggest
+            }
+        );
+        if (!add) {
+            setAdd(true);
+        }
+        setAction('view');
+    };
+
+    const handleAddClick = (event) => {
+        setField({
+            name: '',
+            type: 'text',
+            store: false,
+            sort: false,
+            facet: false,
+            search: false,
+            recommend: false,
+            suggest: false
+        });
+        
+        if(!add) {
+            setAdd(true);
+        }
+        
+        setAction('add');
+    }
+
+    const handleDeleteClick = (name) => {
+        if (selected.includes(name)) {
+            setSelected(selected.filter(a => {return a !== name}));
+        } else {
+            setSelected([...selected, name]);
+        }
+    }
 
     return (
         <div>
@@ -140,149 +237,89 @@ export default function Indexer() {
                 </Grid>
                 <Grid item xs={12} container direction={"row"} spacing={2}>
                     <Grid item>
-                        <Button startIcon={<AddIcon />} onClick={toggleDrawer} size={"small"}>
+                        <Button startIcon={<AddIcon />} onClick={handleAddClick} size={"small"}>
                             增加字段
                         </Button>
                     </Grid>
                     <Grid item>
-                        <Button startIcon={<DeleteIcon />} size={"small"}>
+                        <Button disabled={selected.length === 0} startIcon={<DeleteIcon />} size={"small"}>
                             删除字段
                         </Button>
                     </Grid>
                 </Grid>
                 <Grid item xs={12}>
-                    <div style={{width: '78%'}}>
-                    <MaterialTable
-                        icons={tableIcons}
-                        isLoading={getFieldLoading}
-                        components={{
-                            Container: props => <Paper {...props} elevation={0} variant={"outlined"}/>
-                        }}
-                        title="账单流水"
-                        columns={[
-                            {
-                                title: '字段名称',
-                                field: 'name',
-                                cellStyle: {
-                                    textAlign: 'center'
-                                },
-                                headerStyle: {
-                                    borderRight: '1px solid #ebebeb',
-                                    textAlign: 'center'
-                                }
-                            },
-                            {
-                                title: '字段类型',
-                                field: 'type',
-                                cellStyle: {
-                                    textAlign: 'center'
-                                },
-                                headerStyle: {
-                                    borderRight: '1px solid #ebebeb',
-                                    textAlign: 'center'
-                                }
-                            },
-                            {
-                                title: '可读取',
-                                field: 'amount',
-                                cellStyle: {
-                                    textAlign: 'center'
-                                },
-                                headerStyle: {
-                                    borderRight: '1px solid #ebebeb',
-                                    textAlign: 'center'
-                                }
-                            },
-                            {
-                                title: '过滤',
-                                field: 'status',
-                                cellStyle: {
-                                    textAlign: 'center'
-                                },
-                                headerStyle: {
-                                    borderRight: '1px solid #ebebeb',
-                                    textAlign: 'center'
-                                }
-                            },
-                            {
-                                title: '排序',
-                                field: 'lastUpdateDate',
-                                cellStyle: {
-                                    textAlign: 'center'
-                                },
-                                headerStyle: {
-                                    borderRight: '1px solid #ebebeb',
-                                    textAlign: 'center'
-                                }
-                            },
-                            {
-                                title: '分类',
-                                field: 'lastUpdateDate',
-                                cellStyle: {
-                                    textAlign: 'center'
-                                },
-                                headerStyle: {
-                                    borderRight: '1px solid #ebebeb',
-                                    textAlign: 'center'
-                                }
-                            },
-                            {
-                                title: '搜索',
-                                field: 'lastUpdateDate',
-                                cellStyle: {
-                                    textAlign: 'center'
-                                },
-                                headerStyle: {
-                                    borderRight: '1px solid #ebebeb',
-                                    textAlign: 'center'
-                                }
-                            },
-                            {
-                                title: '推荐',
-                                field: 'lastUpdateDate',
-                                cellStyle: {
-                                    textAlign: 'center'
-                                },
-                                headerStyle: {
-                                    borderRight: '1px solid #ebebeb',
-                                    textAlign: 'center'
-                                }
-                            },
-                            {
-                                title: '提示',
-                                field: 'lastUpdateDate',
-                                cellStyle: {
-                                    textAlign: 'center'
-                                },
-                                headerStyle: {
-                                    borderRight: '1px solid #ebebeb',
-                                    textAlign: 'center'
-                                }
-                            }
-                        ]}
-                        data={fields}
-
-                        options={{
-                            headerStyle: {
-                                backgroundColor:'#F5F5F5'
-                            },
-                            showTitle: false,
-                            toolbar: false,
-                            paging: false,
-                            search: false,
-                            padding:'dense',
-                            tableLayout: "auto",
-                            rowStyle: rowData => ({
-                                fontSize: 14,
-                                backgroundColor: ('credit' === rowData.billType) ? '#fff9e5' : '#FFFFFF'
-                            }),
-                            pageSize: 1000,
-                            body: {
-                                emptyDataSourceMessage: '该日期没有统计数据',
-                            }
-                        }}
+                    <TableContainer component={Paper} style={{width: '75%'}}>
+                        <Table sx={{ minWidth: 650 }} size='small' aria-label="simple table">
+                            <TableHead>
+                                <TableRow>
+                                <TableCell style={{borderRight: '1px solid #ebebeb'}}></TableCell>
+                                    <TableCell style={{borderRight: '1px solid #ebebeb'}}>名称</TableCell>
+                                    <TableCell align="center" style={{borderRight: '1px solid #ebebeb'}}>类型</TableCell>
+                                    <TableCell align="center" style={{borderRight: '1px solid #ebebeb'}}>是否保存</TableCell>
+                                    <TableCell align="center" style={{borderRight: '1px solid #ebebeb'}}>排序</TableCell>
+                                    <TableCell align="center" style={{borderRight: '1px solid #ebebeb'}}>分类</TableCell>
+                                    <TableCell align="center" style={{borderRight: '1px solid #ebebeb'}}>搜索</TableCell>
+                                    <TableCell align="center" style={{borderRight: '1px solid #ebebeb'}}>推荐</TableCell>
+                                    <TableCell align="center">搜索提示</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                <TableRow
+                                    key='id'
+                                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                                >
+                                    <TableCell align='center' style={{width: 10}}>
+                                        <KeyIcon fontSize={"small"}></KeyIcon>
+                                    </TableCell>
+                                    <TableCell align='left'>
+                                        id
+                                    </TableCell>
+                                    <TableCell align="left">字符串</TableCell>
+                                    <TableCell align="center">Y</TableCell>
+                                    <TableCell align="center"></TableCell>
+                                    <TableCell align="center"></TableCell>
+                                    <TableCell align="center"></TableCell>
+                                    <TableCell align="center"></TableCell>
+                                    <TableCell align="center"></TableCell>
+                                </TableRow>
+                                {fields.map((row) => (
+                                    <TableRow
+                                        hover
+                                        key={row.name}
+                                    >
+                                        <TableCell align="center">
+                                            <Checkbox size='small' onClick={() => handleDeleteClick(row.name)}/>
+                                        </TableCell>
+                                        <TableCell align="left" 
+                                        onClick={(event) => handleClick(event, row)}
+                                        >
+                                           <Link href="#" underline="hover"> {row.name}</Link>
+                                        </TableCell>
+                                        <TableCell align="left">{row.type}</TableCell>
+                                        <TableCell align="center">{row.store? <CheckIcon color="primary" fontSize='small'/>:<CloseIcon color="disabled" fontSize='small'/>}</TableCell>
+                                        <TableCell align="center">{row.sort? <CheckIcon color="primary" fontSize='small'/>:<CloseIcon color="disabled" fontSize='small'/>}</TableCell>
+                                        <TableCell align="center">{row.facet? <CheckIcon color="primary" fontSize='small'/>:<CloseIcon color="disabled" fontSize='small'/>}</TableCell>
+                                        <TableCell align="center">{row.search? <CheckIcon color="primary" fontSize='small'/>:<CloseIcon color="disabled" fontSize='small'/>}</TableCell>
+                                        <TableCell align="center">{row.recommend? <CheckIcon color="primary" fontSize='small'/>:<CloseIcon color="disabled" fontSize='small'/>}</TableCell>
+                                        <TableCell align="center">{row.suggest? <CheckIcon color="primary" fontSize='small'/>:<CloseIcon color="disabled" fontSize='small'/>}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                    <TablePagination
+                        rowsPerPageOptions={20}
+                        style={{width: '75%'}}
+                        component="div"
+                        count={fields.length}
+                        rowsPerPage={20}
+                        page={page}
+                        onPageChange={handleChangePage}
                     />
-                    </div>
+                </Grid>
+                
+                <Grid item>
+                    {JSON.stringify(selected)}
                 </Grid>
             </Grid>
             <Drawer
@@ -294,7 +331,7 @@ export default function Indexer() {
             >
                 <Grid container direction={"column"} spacing={1} style={{padding: 10, fontSize: 14}}>
                     <Grid item style={{display:'flex', justifyContent: 'space-between', borderBottom:'1px solid #ebebeb'}}>
-                        <span>新增字段</span> <IconButton aria-label="delete" size="small" onClick={toggleDrawer}><CloseIcon fontSize={"small"}/></IconButton>
+                        <span>{action === 'add'? '新增字段':'查看字段'}</span> <IconButton aria-label="delete" size="small" onClick={toggleDrawer}><CloseIcon fontSize={"small"}/></IconButton>
                     </Grid>
                     <Grid item>
                         字段名称
@@ -302,7 +339,8 @@ export default function Indexer() {
                     <Grid item>
                         <TextField
                             id="filled-size-small"
-                            defaultValue={field.name}
+                            name='name'
+                            value={field.name}
                             onChange={handleNameChange}
                             style={{marginRight: 2, maxWidth: '100%', minWidth: 100}}
                             InputProps={{ style: {fontSize: 14}}}
@@ -317,18 +355,19 @@ export default function Indexer() {
                             <Select
                                 size={"small"}
                                 id="demo-select-small"
-                                defaultValue={field.type}
-                                onChange={handleTypeChange}
+                                name='type'
+                                value={field.type}
+                                onChange={handleNameChange}
                                 style={{ height: 30 }}
                             >
-                                <MenuItem key={1} value='string'>{<Typography style={{fontSize: 14}}>字符串</Typography>}</MenuItem>
+                                <MenuItem key={1} value='text'>{<Typography style={{fontSize: 14}}>字符串</Typography>}</MenuItem>
                                 <MenuItem key={2} value='integer'>{<Typography style={{fontSize: 14}}>整型数字</Typography>}</MenuItem>
                                 <MenuItem key={3} value='float'>{<Typography style={{fontSize: 14}}>小数数字</Typography>}</MenuItem>
                                 <MenuItem key={4} value='date'>{<Typography style={{fontSize: 14}}>日期</Typography>}</MenuItem>
                                 <MenuItem key={5} value='geography'>{<Typography style={{fontSize: 14}}>地理位置</Typography>}</MenuItem>
                                 <MenuItem key={6} value='boolean'>{<Typography style={{fontSize: 14}}>布尔类型</Typography>}</MenuItem>
 
-                                <MenuItem key={1} value='strings'>{<Typography style={{fontSize: 14}}>字符串（多值）</Typography>}</MenuItem>
+                                <MenuItem key={1} value='texts'>{<Typography style={{fontSize: 14}}>字符串（多值）</Typography>}</MenuItem>
                                 <MenuItem key={2} value='integers'>{<Typography style={{fontSize: 14}}>整型数字（多值）</Typography>}</MenuItem>
                                 <MenuItem key={3} value='floats'>{<Typography style={{fontSize: 14}}>小数数字（多值）</Typography>}</MenuItem>
                                 <MenuItem key={4} value='dates'>{<Typography style={{fontSize: 14}}>日期（多值）</Typography>}</MenuItem>
@@ -342,18 +381,18 @@ export default function Indexer() {
                     </Grid>
                     <Grid item>
                         <FormGroup>
-                            <FormControlLabel value='save' control={<Checkbox value='save' size="small" onChange={handlePropsChange}/>} label={<Typography style={{fontSize: 14}}>保存读取</Typography>}/>
-                            <FormControlLabel value='filter' control={<Checkbox value='filter' size="small" onChange={handlePropsChange}/>} label={<Typography style={{fontSize: 14}}>过滤</Typography>}/>
-                            <FormControlLabel value='sort' control={<Checkbox value='sort' size="small" onChange={handlePropsChange}/>} label={<Typography style={{fontSize: 14}}>排序</Typography>}/>
-                            <FormControlLabel value='facet' control={<Checkbox value='facet' size="small" onChange={handlePropsChange}/>} label={<Typography style={{fontSize: 14}}>分类</Typography>}/>
-                            <FormControlLabel value='search' control={<Checkbox value='search' size="small" onChange={handlePropsChange}/>} label={<Typography style={{fontSize: 14}}>搜索</Typography>}/>
-                            <FormControlLabel value='recommend' control={<Checkbox value='recommend' size="small" onChange={handlePropsChange}/>} label={<Typography style={{fontSize: 14}}>推荐</Typography>}/>
-                            <FormControlLabel value='suggest' control={<Checkbox value='suggest' size="small" onChange={handlePropsChange}/>} label={<Typography style={{fontSize: 14}}>搜索提示</Typography>}/>
+                            <FormControlLabel control={<Checkbox name='store' checked={field.store} size="small" onChange={handleNameChange}/>} label={<Typography style={{fontSize: 14}}>保存读取</Typography>}/>
+                            <FormControlLabel control={<Checkbox name='filter' checked={field.filter} size="small" onChange={handleNameChange}/>} label={<Typography style={{fontSize: 14}}>过滤</Typography>}/>
+                            <FormControlLabel control={<Checkbox name='sort' checked={field.sort} size="small" onChange={handleNameChange}/>} label={<Typography style={{fontSize: 14}}>排序</Typography>}/>
+                            <FormControlLabel control={<Checkbox name='facet' checked={field.facet} size="small" onChange={handleNameChange}/>} label={<Typography style={{fontSize: 14}}>分类</Typography>}/>
+                            <FormControlLabel control={<Checkbox name='search' checked={field.search} size="small" onChange={handleNameChange}/>} label={<Typography style={{fontSize: 14}}>搜索</Typography>}/>
+                            <FormControlLabel control={<Checkbox name='recommend' checked={field.recommend} size="small" onChange={handleNameChange}/>} label={<Typography style={{fontSize: 14}}>推荐</Typography>}/>
+                            <FormControlLabel control={<Checkbox name='suggest' checked={field.suggest} size="small" onChange={handleNameChange}/>} label={<Typography style={{fontSize: 14}}>搜索提示</Typography>}/>
                         </FormGroup>
                     </Grid>
                 </Grid>
                 <Grid item style={{display: 'flex', justifyContent: 'flex-start'}}>
-                    <SubmitButton  handleButtonClick={handleSubmit}
+                    <SubmitButton  handleButtonClick={handleSubmit} disabled={action !== 'add'}
                                   size="small"
                                   className={classes.submit}>保存</SubmitButton>
                     <Button variant="outlined" size="small" style={{height: 30, marginTop: 9}} onClick={toggleDrawer}
