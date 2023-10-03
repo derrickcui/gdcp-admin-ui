@@ -83,6 +83,31 @@ export const useDataServicePostAxios = makeUseAxios({
 });
 
 /************************************/
+/*   Delete data service API          */
+/************************************/
+const dataServiceDelAxios = axios.create({ baseURL: process.env.REACT_APP_DATA_SERVICE_URL,
+    method: "DELETE",
+    withCredentials: true
+});
+
+setInterceptors(dataServiceDelAxios);
+export const useDataServiceDelAxios = makeUseAxios({
+    axios: dataServiceDelAxios
+});
+
+/************************************/
+/*   Delete data service API          */
+/************************************/
+const dataServicePutAxios = axios.create({ baseURL: process.env.REACT_APP_DATA_SERVICE_URL,
+    method: "PUT",
+    withCredentials: true
+});
+
+setInterceptors(dataServicePutAxios);
+export const useDataServicePutAxios = makeUseAxios({
+    axios: dataServicePutAxios
+});
+/************************************/
 /*   Word cloud service API         */
 /************************************/
 const getWordCloudAxios = axios.create({ baseURL: process.env.REACT_APP_WORDCLOUD_SERVICE_URL,
@@ -184,17 +209,6 @@ setInterceptors(dataServiceAxios);
 export const useDataServiceAxios = makeUseAxios({
     axios: dataServiceAxios
 });
-
-
-const dataServicePutAxios = axios.create({ baseURL: process.env.REACT_APP_DATA_SERVICE_URL,
-    method: "PUT",
-    withCredentials: true
-});
-setInterceptors(dataServicePutAxios);
-export const useDataServicePutAxios = makeUseAxios({
-    axios: dataServicePutAxios
-});
-
 
 /************************************/
 /*   method to set interceptors     */

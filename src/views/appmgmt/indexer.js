@@ -3,9 +3,9 @@ import {
     Button, Divider, Grid, TextField, Typography, IconButton,TablePagination,
     FormGroup, FormControlLabel, Checkbox, FormControl, Select, MenuItem, Paper
 } from "@mui/material";
-import {useDataServiceGetAxios, useDataServicePostAxios, useSearchEngineGetAxios} from "../../service/api.service";
+import {useDataServiceGetAxios, useDataServicePostAxios, useDataServicePutAxios} from "../../service/api.service";
 import {AppContext} from "../../privacy/AppContext";
-import {MESSAGE_ERROR} from "../../constant";
+import {MESSAGE_ERROR, MESSAGE_SUCCESS} from "../../constant";
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { makeStyles } from "@mui/styles";
@@ -22,6 +22,8 @@ import TableRow from '@mui/material/TableRow';
 import KeyIcon from '@mui/icons-material/Key';
 import CheckIcon from '@mui/icons-material/Check';
 import Link from '@mui/material/Link';
+import CircularProgress from "@mui/material/CircularProgress";
+import Backdrop from "@mui/material/Backdrop";
 
 const useStyles = makeStyles({
     drawer: {
@@ -44,20 +46,26 @@ const useStyles = makeStyles({
 
 export default function Indexer() {
     //const classes = useStyles();
-  /*  const [{data: getAllFieldsData, loading: getAllFieldsLoading, error: getAllFieldsError}, getAllFieldsApi] = useSearchEngineGetAxios(
-        {}, {manual: true});*/
+    const [{data: deleteFieldData, loading: deleteFieldLoading, error: deleteFieldError}, deleteFieldApi] = useDataServicePutAxios(
+        {}, {manual: true});
     const [{data: getFieldData, loading: getFieldLoading, error: getFieldError}, getFieldApi] = useDataServiceGetAxios(
         {}, {manual: true});
     const [{data: addFieldData, loading: addFieldLoading, error: addFieldError}, addFieldApi] = useDataServicePostAxios(
         {}, {manual: true});
 
-    const [fields, setFields] = useState([{name: 'id', type: 'string', store: false, sort: false, suggest: false, search: false, recommend: false, facet: false}]);
+    const [fields, setFields] = useState([]);
     const {application, setMessage} = useContext(AppContext);
-    const { collectionList, setProcessing } = useContext(WorkspaceContext);
+    const {collectionList, setProcessing} = useContext(WorkspaceContext);
     const [add, setAdd] = useState(false);
     const [page, setPage] = React.useState(0);
     const [selected, setSelected] = useState([]);
     const [action, setAction] = useState('add');
+    const [actionResult, setActionResult] = useState({
+        "success": [],
+        "fail": [],
+        "status": -1,
+    });
+
     const [field, setField] = useState({
         name: '',
         type: 'string',
@@ -119,14 +127,12 @@ export default function Indexer() {
                 getFieldApi({
                     url: '/schema/' + collectionList[0] + '/field'
                 });
-                setProcessing(true);
             }
         }
     }, [collectionList]);
 
     useEffect(() => {
         if (!getFieldLoading) {
-            setProcessing(false);
             if (getFieldError) {
                 setMessage({
                     type: MESSAGE_ERROR,
@@ -149,6 +155,10 @@ export default function Indexer() {
                         type: MESSAGE_ERROR,
                         text: "错误代码:" + addFieldError.response.data.code + ", 错误信息：" + addFieldError.response.data.message
                     });
+                    setActionResult({
+                        "fail": [field.name],
+                        "status": 1
+                    });
                 } else {
                     setMessage({
                         type: MESSAGE_ERROR,
@@ -157,30 +167,54 @@ export default function Indexer() {
                 }
             } else if (addFieldData) {
                 if(addFieldData.status === 0) {
+                    setMessage({
+                        type: MESSAGE_SUCCESS,
+                        text: "增加字段成功"
+                    });
+                    setActionResult({
+                        "success": [field.name],
+                        "status": 0
+                    });
                     getFieldApi({
                         url: '/schema/' + collectionList[0] + '/field'
                     });
                     setAdd(!add);
-                    setProcessing(true);
                 }
             }
         }
     }, [addFieldLoading, addFieldData, addFieldError]);
 
     useEffect(() => {
-        if (!getFieldLoading) {
-            if (getFieldError) {
-                setMessage({
-                    type: MESSAGE_ERROR,
-                    text: "错误代码:" + getFieldError.code + ", 错误信息：" + getFieldError.message
-                });
-            } else if (getFieldData) {
-                if(getFieldData.status === 0 && getFieldData.result && getFieldData.result.length > 0) {
-                    setFields(getFieldData.result);
+        if (!deleteFieldLoading) {
+            setProcessing(false);
+            if (deleteFieldError) {
+                if (deleteFieldError.response && deleteFieldError.response.data) {
+                    setMessage({
+                        type: MESSAGE_ERROR,
+                        text: "错误代码:" + deleteFieldError.response.data.code + ", 错误信息：" + deleteFieldError.response.data.message
+                    });
+                } else {
+                    setMessage({
+                        type: MESSAGE_ERROR,
+                        text: "请检查网络正常或者联系技术支持"
+                    });
+                }
+            } else if (deleteFieldData) {
+                if(deleteFieldData.status === 0) {
+                    setMessage({
+                        type: MESSAGE_SUCCESS,
+                        text: "删除字段成功"
+                    });
+                    setFields(deleteFieldData.result.fields);
+                    setActionResult({
+                        "success": deleteFieldData.result.success,
+                        "fail": deleteFieldData.result.fail,                        
+                        "status": 0
+                    });
                 }
             }
         }
-    }, [getFieldLoading, getFieldData, getFieldError]);
+    }, [deleteFieldLoading, deleteFieldData, deleteFieldError]);
 
     const handleClick = (event, row) => {
         setField(
@@ -228,6 +262,41 @@ export default function Indexer() {
         }
     }
 
+    const handleDeleteAction = () => {
+        if (selected.length === 0) {
+            setMessage('请选择要删除的字段');
+            return;
+        }
+
+        deleteFieldApi({
+            url: '/schema/field/' + collectionList[0],
+            data: selected
+        });
+        setProcessing(true);
+    }
+
+    const getDataType = (type) => {
+        if (type === '' || !type) {
+            return "未定义类型"
+        }
+
+        if (type === 'text') return '字符串';
+        if (type === 'integer') return '整型数字';
+        if (type === 'float') return '小数数字';
+        if (type === 'date') return '日期';
+        if (type === 'geography') return '地理位置';
+        if (type === 'boolean') return '布尔类型';
+
+        if (type === 'texts') return '字符串（多值）';
+        if (type === 'integers') return '整型数字（多值）';
+        if (type === 'floats') return '小数数字（多值）';
+        if (type === 'dates') return '日期（多值）';
+        if (type === 'geographys') return '地理位置（多值）';
+        if (type === 'booleans') return '布尔类型（多值）';
+
+        return "未定义类型"
+    }
+
     return (
         <div>
             <Grid container spacing={1}>
@@ -242,7 +311,7 @@ export default function Indexer() {
                         </Button>
                     </Grid>
                     <Grid item>
-                        <Button disabled={selected.length === 0} startIcon={<DeleteIcon />} size={"small"}>
+                        <Button disabled={selected.length === 0} onClick={handleDeleteAction} startIcon={<DeleteIcon />} size={"small"}>
                             删除字段
                         </Button>
                     </Grid>
@@ -275,7 +344,7 @@ export default function Indexer() {
                                         id
                                     </TableCell>
                                     <TableCell align="left">字符串</TableCell>
-                                    <TableCell align="center">Y</TableCell>
+                                    <TableCell align="center"><CheckIcon color="primary" fontSize='small'/></TableCell>
                                     <TableCell align="center"></TableCell>
                                     <TableCell align="center"></TableCell>
                                     <TableCell align="center"></TableCell>
@@ -295,7 +364,7 @@ export default function Indexer() {
                                         >
                                            <Link href="#" underline="hover"> {row.name}</Link>
                                         </TableCell>
-                                        <TableCell align="left">{row.type}</TableCell>
+                                        <TableCell align="left">{getDataType(row.type)}</TableCell>
                                         <TableCell align="center">{row.store? <CheckIcon color="primary" fontSize='small'/>:<CloseIcon color="disabled" fontSize='small'/>}</TableCell>
                                         <TableCell align="center">{row.sort? <CheckIcon color="primary" fontSize='small'/>:<CloseIcon color="disabled" fontSize='small'/>}</TableCell>
                                         <TableCell align="center">{row.facet? <CheckIcon color="primary" fontSize='small'/>:<CloseIcon color="disabled" fontSize='small'/>}</TableCell>
@@ -319,7 +388,21 @@ export default function Indexer() {
                 </Grid>
                 
                 <Grid item>
-                    {JSON.stringify(selected)}
+                    {(actionResult.status === 0 || actionResult.status === 1) && <Grid container direction="column">
+                            <Grid item>
+                                执行结果
+                            </Grid>
+                            <Grid item>
+                                {actionResult.success && actionResult.success.length > 0 &&
+                                    <div key='success' style={{display:'flex', fontSize: 14, flexDirection: 'row', spacing: 5}}>成功{action === 'add'? '新增':'删除'}字段:{actionResult.success.map(item => {return <div key={item} style={{color: 'green', marginLeft: 10}}>{item}</div>})}</div>
+                                }
+                            </Grid>    
+                            <Grid item>
+                                {actionResult.fail && actionResult.fail.length > 0 &&
+                                    <div key='fail' style={{display:'flex', fontSize: 14, flexDirection: 'row', spacing: 5}}>失败{action === 'add'? '新增':'删除'}字段:{actionResult.fail.map(item => {return <div key={item} style={{color: 'red', marginLeft: 10}}>{item}</div>})}</div>
+                                }
+                            </Grid>    
+                        </Grid>}
                 </Grid>
             </Grid>
             <Drawer
@@ -402,6 +485,13 @@ export default function Indexer() {
                 </Grid>
 
             </Drawer>
+
+            <Backdrop
+                sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
+                open={getFieldLoading}
+            >
+                <CircularProgress color="inherit" />
+            </Backdrop>
         </div>
             )
 }
